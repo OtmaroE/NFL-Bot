@@ -1,8 +1,8 @@
-const Links = require('../dbConnection');
+const mongooseConnection = require('../dbConnection');
 module.exports = function(controller) {
   // Positive result: <http://www.google.com|www.google.com>
   const urlRegex = new RegExp('^<(.*)\:\/\/(.*)\.(.*)\.(.*)\.(.*)>');
-  const simpleUrlRegex = /\<http\:\/\/([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*)?)\|(\1)\>/
+  const simpleUrlRegex = /(\<http\:\/\/([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:.*\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*)?)\|(\2)\>)((\ \[\w*\])*)/
   
   controller.hears('Show me around', 'direct_message, direct_mention', function(bot, message) {
     const helpString = `:drake: To add a link type: \`link <link>\`
@@ -12,6 +12,7 @@ module.exports = function(controller) {
 
     bot.reply(message, helpString);
   });
+  
   controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention,', function(bot, message) {
     
     // message.match.input should be: link <http://www.google.com|www.google.com>
@@ -21,7 +22,7 @@ module.exports = function(controller) {
     
     if (!urlRegex.test(linkToSave))  
        return bot.reply(message, ' :warning: Please use correct format: `www.site.domain`');
-    Links.find({
+    mongooseConnection.Links.find({
       user: userRequestingInsert,
       url: linkToSave
     })
@@ -30,7 +31,7 @@ module.exports = function(controller) {
       return;
     })
     .then( () => {
-      return Links.create({
+      return mongooseConnection.Links.create({
         user: userRequestingInsert,
         channel: userChannel,
         url: linkToSave
@@ -47,7 +48,7 @@ module.exports = function(controller) {
   
   controller.hears('show links', 'direct_message, direct_mention', function(bot, message) {
     const userRequestingInfo = `<@${message.user}>`
-    Links.find({ 
+    mongooseConnection.Links.find({ 
       user: userRequestingInfo 
     })
     .then((linkList) => {
@@ -71,7 +72,7 @@ module.exports = function(controller) {
     const linkToDelete = message.match.input.split(' ')[1];
 
     const deletePromise = new Promise((resolve, reject) => {
-      Links.deleteOne({
+      mongooseConnection.Links.deleteOne({
       user: userRequestingDelete,
       url: linkToDelete
       },
@@ -100,14 +101,30 @@ module.exports = function(controller) {
   
   controller.hears('(.*)', 'direct_message, direct_mention, ambient', function(bot, message) {
     let receivedMessage = message.match[1];
+    const username = `<@${message.user}>`;
+    const userChannel = `<#${message.channel}>`;
     let foundUrl = '';
-    let urlList = [];
+    let urlFound = '';
+    let tags = '';
+    // will capture each link + tags and save to db on every iteration
     while(foundUrl = simpleUrlRegex.exec(receivedMessage)){
-      console.log(receivedMessage);
-      urlList.push(foundUrl[0]);
+      urlFound = foundUrl[1];
+      tags = foundUrl[0].split('[');
+      tags.shift();
+      tags = tags.map((element) => element.split(']')[0]);
       receivedMessage = receivedMessage.replace(foundUrl[0], '');
+      mongooseConnection.Records.find
+      mongooseConnection.Records.create({
+        user: username,
+        channel: userChannel,
+        url: urlFound,
+        tags: tags
+      })
+      .then((insertedData) => {
+        // console.log(insertedData);
+        // bot.reply(message, `${insertedData.url}\nTags: ${insertedData.tags.toString()}\nBy: ${insertedData.user}\nAt:${insertedData.channel}`);
+        bot.reply(message, `Capture link: ${insertedData.url}`);
+      })
     }
-    urlList.length > 0 ? bot.reply(message, urlList.toString()) : bot.reply(message, 'no links');
   });
-
 };
