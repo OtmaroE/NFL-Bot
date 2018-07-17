@@ -8,7 +8,18 @@ const linksSchema = mongoose.Schema({
   user: String,
   channel: String,
   url: String
-})
+});
 const Links = mongoose.model('Links', linksSchema);
 
-module.exports = Links;
+const recordsSchema = mongoose.Schema({
+  user: String,
+  channel: String,
+  url: String,
+  tags: Array
+});
+const Records = mongoose.model('Records', recordsSchema);
+
+module.exports = {
+  Links,
+  Records
+};
