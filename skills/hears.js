@@ -10,7 +10,10 @@ module.exports = function(controller) {
 
     bot.reply(message, helpString);
   })
-  controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention', function(bot, message) {
+  constroller.hears(urlRegex, 'ambient', function(bot, message) {
+    bot.reply(message, 'man you typed a link');
+  });
+  controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention,', function(bot, message) {
     
     // message.match.input should be: link <http://www.google.com|www.google.com>
     const linkToSave = message.match.input.split(' ')[1];
