@@ -2,6 +2,8 @@ const Links = require('../dbConnection');
 module.exports = function(controller) {
   // Positive result: <http://www.google.com|www.google.com>
   const urlRegex = new RegExp('^<(.*)\:\/\/(.*)\.(.*)\.(.*)\.(.*)>');
+  const simpleUrlRegex = /\<http\:\/\/([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*)?)\|(\1)\>/
+  
   controller.hears('Show me around', 'direct_message, direct_mention', function(bot, message) {
     const helpString = `:drake: To add a link type: \`link <link>\`
 :drake: To show all the links you have saved type: \`show links\`
@@ -9,9 +11,6 @@ module.exports = function(controller) {
 :drake: Have fun around!`;
 
     bot.reply(message, helpString);
-  })
-  constroller.hears(urlRegex, 'ambient', function(bot, message) {
-    bot.reply(message, 'man you typed a link');
   });
   controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention,', function(bot, message) {
     
@@ -99,7 +98,16 @@ module.exports = function(controller) {
     bot.reply(message, 'Just look at the mirror!');
   });
   
-  controller.hears('.*', 'direct_message, direct_mention', function(bot, message) {
-    bot.reply(message, `:robot_face: 404`);
-  })
+  controller.hears('(.*)', 'direct_message, direct_mention, ambient', function(bot, message) {
+    let receivedMessage = message.match[1];
+    let foundUrl = '';
+    let urlList = [];
+    while(foundUrl = simpleUrlRegex.exec(receivedMessage)){
+      console.log(receivedMessage);
+      urlList.push(foundUrl[0]);
+      receivedMessage = receivedMessage.replace(foundUrl[0], '');
+    }
+    urlList.length > 0 ? bot.reply(message, urlList.toString()) : bot.reply(message, 'no links');
+  });
+
 };
