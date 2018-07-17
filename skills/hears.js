@@ -12,7 +12,6 @@ module.exports = function(controller) {
 
     bot.reply(message, helpString);
   });
-  
   controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention,', function(bot, message) {
     
     // message.match.input should be: link <http://www.google.com|www.google.com>
