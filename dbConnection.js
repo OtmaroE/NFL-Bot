@@ -15,7 +15,8 @@ const recordsSchema = mongoose.Schema({
   user: String,
   channel: String,
   url: String,
-  tags: Array
+  tags: Array,
+  created: Date
 });
 const Records = mongoose.model('Records', recordsSchema);
 

@@ -79,8 +79,7 @@ module.exports = function(controller) {
         function (deleteError) {
         if(deleteError) reject(':cry: I think I got that wrong :( \n Nothing to delete!');
         resolve(':heavy_check_mark: Link has been deleted!');
-      }
-      )
+      })
     });
     deletePromise
       .then((promiseResponse) => {
@@ -103,28 +102,56 @@ module.exports = function(controller) {
     let receivedMessage = message.match[1];
     const username = `<@${message.user}>`;
     const userChannel = `<#${message.channel}>`;
+      insertUniqueLinks(receivedMessage, username, userChannel, bot, message);
+  });
+  
+  function insertUniqueLinks(receivedMessage, username, userChannel, bot, message) {
     let foundUrl = '';
     let urlFound = '';
     let tags = '';
-    // will capture each link + tags and save to db on every iteration
-    while(foundUrl = simpleUrlRegex.exec(receivedMessage)){
+    
+    if (foundUrl = simpleUrlRegex.exec(receivedMessage)) {
       urlFound = foundUrl[1];
+      // foundUrl[0] should be like: <http://www.google.com|www.google.com> [ta g1] [tag2] [tag3]
       tags = foundUrl[0].split('[');
       tags.shift();
       tags = tags.map((element) => element.split(']')[0]);
       receivedMessage = receivedMessage.replace(foundUrl[0], '');
-      mongooseConnection.Records.find
-      mongooseConnection.Records.create({
+      const findUrl = new Promise((resolve, reject) => {
+        mongooseConnection.Records.find({
         user: username,
         channel: userChannel,
-        url: urlFound,
-        tags: tags
+        url: urlFound
+        }, (err, record) => {
+          if(err) reject('Mongoose Broke');
+          resolve(record);
+        })
+      })
+      .then((recordFound) => {
+        console.log(recordFound);
+        if(recordFound[0]) throw ('The link already Exists');
+        return
+      })
+      .then(() => {
+        return mongooseConnection.Records.create({
+          user: username,
+          channel: userChannel,
+          url: urlFound,
+          tags: tags,
+          created: new Date()
+        })
       })
       .then((insertedData) => {
-        // console.log(insertedData);
+        console.log(insertedData);
         // bot.reply(message, `${insertedData.url}\nTags: ${insertedData.tags.toString()}\nBy: ${insertedData.user}\nAt:${insertedData.channel}`);
         bot.reply(message, `Capture link: ${insertedData.url}`);
+        // See if there are links + tags left on the string
+        insertUniqueLinks(receivedMessage, username, userChannel, bot, message);
+      })
+      .catch((error) => {
+        console.log(error);
       })
     }
-  });
+    // no links left, we just exit.
+  }
 };
