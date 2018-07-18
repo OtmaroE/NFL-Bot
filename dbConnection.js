@@ -15,11 +15,21 @@ const recordsSchema = mongoose.Schema({
   user: String,
   channel: String,
   url: String,
-  tags: Array
+  tags: Array,
+  ts: String,
+  created: Date
 });
 const Records = mongoose.model('Records', recordsSchema);
 
+const likeSchema = mongoose.Schema({
+  ts: String,
+  username: String,
+  created: Date
+});
+const Likes = mongoose.model('Like', likeSchema);
+
 module.exports = {
   Links,
-  Records
+  Records,
+  Likes
 };
