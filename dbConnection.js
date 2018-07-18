@@ -17,7 +17,7 @@ const recordsSchema = mongoose.Schema({
   url: String,
   tags: Array,
   ts: String,
-  likes: Array
+  created: Date
 });
 const Records = mongoose.model('Records', recordsSchema);
 

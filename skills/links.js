@@ -3,7 +3,10 @@ module.exports = function(controller) {
   // Positive result: <http://www.google.com|www.google.com>
   const urlRegex = new RegExp('^<(.*)\:\/\/(.*)\.(.*)\.(.*)\.(.*)>');
   const simpleUrlRegex = /(\<http\:\/\/([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:.*\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*)?)\|(\2)\>)((\ \[\w*\])*)/
-  
+  // /((\<.*\:\/\/.*\..*\..*\..*>))((\ \[\w*\])*)/
+  // /(\<http\:\/\/([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:.*\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*)?)\|(\2)\>)((\ \[\w*\])*)/
+  const channelParseRegex = /\<\#(.{9})\|/;
+  const userIdAndSpamParseRegex = /\<\@(.{9})\> this (\w*)/;
   controller.hears('Show me around', 'direct_message, direct_mention', function(bot, message) {
     const helpString = `:drake: To add a link type: \`link <link>\`
 :drake: To show all the links you have saved type: \`show links\`
@@ -13,7 +16,7 @@ module.exports = function(controller) {
     bot.reply(message, helpString);
   });
   
-  controller.hears(['^link (.*)', '^link'], 'direct_message, direct_mention,', function(bot, message) {
+  controller.hears(['^link\ (.*)', '^link '], 'direct_message, direct_mention,', function(bot, message) {
     
     // message.match.input should be: link <http://www.google.com|www.google.com>
     const linkToSave = message.match.input.split(' ')[1];
@@ -98,19 +101,65 @@ module.exports = function(controller) {
     bot.reply(message, 'Just look at the mirror!');
   });
   
+  controller.hears('links from this week', 'direct_mention', function(bot, message) {
+    const userChannel = `<#${message.channel}>`;
+    const untilDate = new Date();
+    const fromDate = new Date(untilDate.getDate() - 7);
+    sendLinksAtDateSpam(fromDate, untilDate, userChannel, bot, message);
+  });
+  
+  controller.hears('links from this month', 'direct_mention', function(bot, message) {
+    const userChannel = `<#${message.channel}>`;
+    const untilDate = new Date();
+    const fromDate = new Date(untilDate.getDate() - 30);
+    sendLinksAtDateSpam(fromDate, untilDate, userChannel, bot, message);
+  });
+  
+  controller.hears('^links from .*', 'direct_message', function(bot, message) {
+    const username = `<@${message.user}>`;
+    const messageToParse = message.text;
+    const channelRequestId = channelParseRegex.exec(messageToParse)[1];
+    if(channelRequestId)
+    mongooseConnection.Records.find({
+      channel: `<#${channelRequestId}>`,
+      user: username
+    })
+    .then((linkList) => {
+      bot.reply(message, `These are your links:\n`);
+      let linkListResponse = '';
+      for (let link of linkList) {
+        linkListResponse += `:earth_americas: URL: ${link.url}tUser: <@${message.user}>\n\t\t:cyclone:Tags: \`${link.tags.toString()}\`\n`;
+      }
+      bot.reply(message, linkListResponse);
+    })
+  });
+  
+  controller.hears('^links shared by (.*) this (.*)', 'direct_mention', function(bot, message) {
+    const messageToParse = message.text;
+    console.log(messageToParse);
+    const currentChannel = `<#${message.channel}>`;
+    const parsedRequest = userIdAndSpamParseRegex.exec(messageToParse);
+    console.log(parsedRequest);
+    const requestedUser = parsedRequest[1];
+    const timeSpamRequest = parsedRequest[2];
+    console.log(requestedUser, timeSpamRequest);
+    bot.reply(message, `Findind messages:\nUser: <@${requestedUser}>\nChannel: ${currentChannel}\nSpam: this ${timeSpamRequest}`);
+  });
+  
   controller.hears('(.*)', 'direct_message, direct_mention, ambient', function(bot, message) {
     let receivedMessage = message.match[1];
     const username = `<@${message.user}>`;
     const userChannel = `<#${message.channel}>`;
     const ts = message.ts;
-      insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
+    insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
   });
   
   controller.on('reaction_added' , function(bot, message) {
     const username = `<@${message.user}>`;
     const reactionType = message.reaction;
     const messageLiked = message.raw_message.event.item;
-    console.log(reactionType)
+    console.log(reactionType);
+    console.log(messageLiked);
     if(reactionType === '+1'){
       mongooseConnection.Likes.create({
         ts: messageLiked.ts,
@@ -119,7 +168,19 @@ module.exports = function(controller) {
       })
     }
   });
-  
+  function sendLinksAtDateSpam(fromDate, untilDate, userChannel, bot, message) {
+    mongooseConnection.Records.find({
+      channel: userChannel,
+      created: { $gte: fromDate, $lte: untilDate }
+    })
+    .then((linkList) => {
+      let linkListResponse = '';
+      for (let linkRecord of linkList) {
+        linkListResponse += `:earth_americas: URL: ${linkRecord.url}\tUser: <@${message.user}>\n\t\t:cyclone: Tags: \`${linkRecord.tags.toString()}\`\n`
+      }
+      bot.reply(message, linkListResponse);
+    })
+  }
   function insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message) {
     let foundUrl = '';
     let urlFound = '';
@@ -143,7 +204,6 @@ module.exports = function(controller) {
         })
       })
       .then((recordFound) => {
-        console.log(recordFound);
         if(recordFound[0]) throw ('The link already Exists');
         return
       })
@@ -153,11 +213,11 @@ module.exports = function(controller) {
           channel: userChannel,
           url: urlFound,
           tags: tags,
+          created: new Date(),
           ts: ts
         })
       })
       .then((insertedData) => {
-        console.log(insertedData);
         // bot.reply(message, `${insertedData.url}\nTags: ${insertedData.tags.toString()}\nBy: ${insertedData.user}\nAt:${insertedData.channel}`);
         bot.reply(message, `Capture link: ${insertedData.url}`);
         // See if there are links + tags left on the string
