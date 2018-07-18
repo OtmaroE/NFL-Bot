@@ -69,7 +69,8 @@ var bot_options = {
     // debug: true,
     scopes: ['bot'],
     studio_token: process.env.studio_token,
-    studio_command_uri: process.env.studio_command_uri
+    studio_command_uri: process.env.studio_command_uri,
+    require_delivery: true,
 };
 
 // Use a mongo database if specified, otherwise store in a JSON file local to the app.
@@ -141,7 +142,7 @@ if (!process.env.clientId || !process.env.clientSecret) {
   // You can tie into the execution of the script using the functions
   // controller.studio.before, controller.studio.after and controller.studio.validate
   if (process.env.studio_token) {
-      controller.on('direct_message,direct_mention,mention', function(bot, message) {
+      controller.on('direct_message,direct_mention,mention,reaction_aded', function(bot, message) {
           controller.studio.runTrigger(bot, message.text, message.user, message.channel, message).then(function(convo) {
               if (!convo) {
                   // no trigger was matched

@@ -102,10 +102,25 @@ module.exports = function(controller) {
     let receivedMessage = message.match[1];
     const username = `<@${message.user}>`;
     const userChannel = `<#${message.channel}>`;
-      insertUniqueLinks(receivedMessage, username, userChannel, bot, message);
+    const ts = message.ts;
+      insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
   });
   
-  function insertUniqueLinks(receivedMessage, username, userChannel, bot, message) {
+  controller.on('reaction_added' , function(bot, message) {
+    const username = `<@${message.user}>`;
+    const reactionType = message.reaction;
+    const messageLiked = message.raw_message.event.item;
+    console.log(reactionType)
+    if(reactionType === '+1'){
+      mongooseConnection.Likes.create({
+        ts: messageLiked.ts,
+        username: username,
+        created: new Date()
+      })
+    }
+  });
+  
+  function insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message) {
     let foundUrl = '';
     let urlFound = '';
     let tags = '';
@@ -138,7 +153,7 @@ module.exports = function(controller) {
           channel: userChannel,
           url: urlFound,
           tags: tags,
-          created: new Date()
+          ts: ts
         })
       })
       .then((insertedData) => {
@@ -146,7 +161,7 @@ module.exports = function(controller) {
         // bot.reply(message, `${insertedData.url}\nTags: ${insertedData.tags.toString()}\nBy: ${insertedData.user}\nAt:${insertedData.channel}`);
         bot.reply(message, `Capture link: ${insertedData.url}`);
         // See if there are links + tags left on the string
-        insertUniqueLinks(receivedMessage, username, userChannel, bot, message);
+        insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
       })
       .catch((error) => {
         console.log(error);
