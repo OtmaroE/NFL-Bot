@@ -4,10 +4,11 @@ module.exports = function(controller) {
   const urlRegex = new RegExp('^<(.*)\:\/\/(.*)\.(.*)\.(.*)\.(.*)>');
   const simpleUrlRegex = /\<(([A-Za-z]{3,9}:(?:\/\/)?(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)(?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))(\S*\>)((\ \[\w*\])*)/
   const channelParseRegex = /\<\#(.{9})\|/;
-  const userIdAndSpamParseRegex = /\<\@(.{9})\> this (\w*)/;
+  const userIdAndSpamParseRegex = /\<\@(.{9})\> (this|about) (.*)/;
   const likesAndTagsRegEx = /^links with \+(\d*)( about (.*))?/;
   const tagsRequestRegEx = /(\w*)(\ or\ (\w*))?/
   const likeRegEx = /^\+1(.*)/;
+  const userIdAandTagsRegex = /\<\@(.{9})\> about (.*)/
   
   controller.hears('Show me around', 'direct_message, direct_mention', function(bot, message) {
     const helpString = `:drake: To add a link type: \`link <link>\`
@@ -138,22 +139,56 @@ module.exports = function(controller) {
     })
   });
   
-  controller.hears('^links shared by (.*) this (.*)', 'direct_mention', function(bot, message) {
+  controller.hears(/^links shared by (.*)/, 'direct_mention', function(bot, message) {
     const messageToParse = message.text;
     const currentChannel = `<#${message.channel}>`;
-    const parsedRequest = userIdAndSpamParseRegex.exec(messageToParse);
-    const requestedUser = parsedRequest[1];
-    const timeSpamRequest = parsedRequest[2];
-    const untilDate = new Date();
-    switch (timeSpamRequest) {
-      case 'week': 
-        sendLinksAtDateSpam(new Date(untilDate.getDate() - 7), untilDate, currentChannel, bot, message, `<@${requestedUser}>`);
-        break;
-      case 'month':
-        sendLinksAtDateSpam(new Date(untilDate.getDate() - 30), untilDate, currentChannel, bot, message, `<@${requestedUser}>`);
-      default: break;
+    let parsedRequest = '';
+    parsedRequest = userIdAndSpamParseRegex.exec(messageToParse);
+  
+    console.log('Parsed Request: ', parsedRequest);
+    if(parsedRequest[2]) {
+      let requestedUser = '';
+      switch (parsedRequest[2]) {
+        case 'this':
+          requestedUser = parsedRequest[1];
+          const timeSpamRequest = parsedRequest[3];
+          const untilDate = new Date();
+          switch (timeSpamRequest) {
+            case 'week': 
+              sendLinksAtDateSpam(new Date(untilDate.getDate() - 7), untilDate, currentChannel, bot, message, `<@${requestedUser}>`);
+              break;
+            case 'month':
+              sendLinksAtDateSpam(new Date(untilDate.getDate() - 30), untilDate, currentChannel, bot, message, `<@${requestedUser}>`);
+            default: break;
+          }
+          break;
+        case 'about':
+          requestedUser = parsedRequest[1];
+          const tagsToParse = parsedRequest[3];
+          const tagsParsed = tagsRequestRegEx.exec(tagsToParse);
+          console.log('Tags to parse', tagsToParse);
+          console.log('Tags parsed', tagsParsed);
+          const firstTag = tagsParsed[1];
+          const secondTag = tagsParsed[3];
+          const searchCriteria = {channel: currentChannel, user: `<@${requestedUser}>`};
+          if(firstTag) searchCriteria.tags = firstTag;
+          if(secondTag) searchCriteria.tags = {'$in': [firstTag, secondTag]};
+          console.log('search Criteria:',searchCriteria);
+          if(searchCriteria.tags)
+          mongooseConnection.Records.find(searchCriteria)
+          .then((recordList) => {
+            let response = '';
+            for (let record of recordList) {
+              response += `:earth_americas: URL: ${record.url}\tUser: ${record.user}\n\t\t:cyclone:Tags: \`${record.tags.toString()}\`\n`;
+            }
+            bot.reply(message, response);
+          })
+          break;
+        default: break;
+      }
     }
   });
+  
   controller.hears(/^links with \+(.*)/, 'direct_mention, direct_message', function(bot, message) {
     const requestedChannel = `<#${message.channel}>`;
     // console.log(message);
@@ -180,20 +215,23 @@ module.exports = function(controller) {
     if(searchCriteria.likesCount)
     mongooseConnection.Records.find(searchCriteria)
     .then((recordList) => {
-      for (let record of recordList) {
-        bot.reply(message, record.url);
-      }
+        let response = '';
+        for (let record of recordList) {
+          response += `:earth_americas: URL: ${record.url}\tUser: ${record.user}\n\t\t:cyclone:Tags: \`${record.tags.toString()}\`\n`;
+        }
+        bot.reply(message, response);
     })
     // console.log(parsedMessage);
     // console.log(parsedTags);
     // bot.reply(message, `Likes: ${likeCount}\nTags: ${firstTag} ${secondTag}`);
   })
   controller.hears('(.*)\m', 'direct_message, direct_mention, ambient', function(bot, message) {
+    console.log('catch all')
     let receivedMessage = message.text;
     const username = `<@${message.user}>`;
     const userChannel = `<#${message.channel}>`;
     const ts = message.ts;
-    console.log(receivedMessage, 'Original');
+    // console.log(receivedMessage, 'Original');
     insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
   });
    
@@ -201,9 +239,9 @@ module.exports = function(controller) {
     const username = `<@${message.user}>`;
     const reactionType = message.reaction;
     const messageLiked = message.raw_message.event.item;
-    console.log(reactionType)
+    // console.log(reactionType)
     if(reactionType.startsWith('+1')){
-      console.log('like detected');
+      // console.log('like detected');
       mongooseConnection.Likes.create({
         ts: messageLiked.ts,
         username: username,
@@ -215,11 +253,11 @@ module.exports = function(controller) {
     }
   });
   controller.on('reaction_removed', function(bot, message) {
-    console.log(message.reaction);
+    // console.log(message.reaction);
     if(message.reaction.startsWith('+1')){
       const username = `<@${message.user}>`;
       const tsItemToRemove = message.item.ts;
-      console.log(username, tsItemToRemove);
+      // console.log(username, tsItemToRemove);
       mongooseConnection.Likes.deleteOne({
       username: username,
       ts: tsItemToRemove
@@ -232,10 +270,10 @@ module.exports = function(controller) {
   })
   
   function updateLikesCount(likedRecordTs){
-    console.log('entered', likedRecordTs);
+    // console.log('entered', likedRecordTs);
     mongooseConnection.Likes.count({ ts: likedRecordTs }, function (err, likesCount) {
       if(err) return console.log('fail');
-      console.log('we are not that bad:', likesCount, likedRecordTs)
+      // console.log('we are not that bad:', likesCount, likedRecordTs)
       mongooseConnection.Records.findOneAndUpdate(
         { ts: likedRecordTs },
         { likesCount: likesCount },
@@ -307,7 +345,7 @@ module.exports = function(controller) {
         // bot.reply(message, `${insertedData.url}\nTags: ${insertedData.tags.toString()}\nBy: ${insertedData.user}\nAt:${insertedData.channel}`);
         // bot.reply(message, `Capture link: ${insertedData.url}`);
         // See if there are links + tags left on the string
-        console.log('link inserted')
+        // console.log('link inserted')
         insertUniqueLinks(receivedMessage, username, ts, userChannel, bot, message);
       })
       .catch((error) => {
