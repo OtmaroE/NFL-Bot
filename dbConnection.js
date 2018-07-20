@@ -17,6 +17,7 @@ const recordsSchema = mongoose.Schema({
   url: String,
   tags: Array,
   ts: String,
+  likesCount: Number,
   created: Date
 });
 const Records = mongoose.model('Records', recordsSchema);
@@ -26,10 +27,10 @@ const likeSchema = mongoose.Schema({
   username: String,
   created: Date
 });
-const Likes = mongoose.model('Like', likeSchema);
+const Likes = mongoose.model('Likes', likeSchema);
 
 module.exports = {
   Links,
   Records,
-  Likes
+  Likes,
 };
