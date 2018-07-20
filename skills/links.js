@@ -105,7 +105,99 @@ module.exports = function(controller) {
   });
   
   // === Real Bot 
+  controller.hears('^delete my links', 'direct_message, direct_mention', function(bot, message) {
+    const userRequestingDelete = `<@${message.user}>`;
+    const currentChannel = `<#${message.channel}>`;
+    const interactiveMessage = {
+    "text": "Bellow you can find your links!",
+    "response_type": "ephemeral",
+    "attachments": [
+        {
+            "text": "Choose a link to delete",
+            "fallback": "If you could read this message, you'd be choosing something fun to do right now.",
+            "color": "#3AA3E3",
+            "attachment_type": "default",
+            "callback_id": "link_delete",
+            "actions": [
+                  {
+                    "name": "games_list",
+                    "text": "Pick a link...",
+                    "type": "select",
+                    "options": []
+                  }
+                ]
+              }
+            ]
+          }
+    mongooseConnection.Records.find({
+      user: userRequestingDelete,
+      channel: currentChannel
+    },
+    function(err, docs) {
+      for (let link of docs) {
+        interactiveMessage.attachments[0].actions[0].options.push({"text": link.url, value: link.url});
+      }
+      bot.reply(message, interactiveMessage);
+    })
+  });
   
+  controller.on('interactive_message_callback', function(bot, message) {
+    if(message.callback_id === 'link_delete'){
+      const jsonResponse = {
+    "attachments": [
+        {
+            "fallback": "Choose a link to delete",
+           "callback_id": "delete_confirm",
+            "actions": [
+                {
+                    "type": "button",
+                    "name": "yes",
+                    "text": "Yes, delete",
+                    "style": "primary",
+                    "value": "User ID||URL"
+                },
+                {
+                    "type": "button",
+                    "name": "no",
+                    "text": "No, hold up!",
+                    "style": "danger"
+                  }
+                ]
+              }
+            ]
+          } 
+      const userRequestingDelete = `<@${message.user}>`;
+      const currentChannel = `<#${message.channel}>`;
+      const urlToDelete = message.text;
+      console.log(message);
+      jsonResponse.text = `Deleting: ${urlToDelete} from ${userRequestingDelete}.\nAre you sure?`
+      jsonResponse.attachments[0].actions[0].value = `${message.user}||${urlToDelete}`
+      bot.replyInteractive(message, jsonResponse);
+    }
+    if(message.callback_id === 'delete_confirm') {
+      console.log(message);
+      if(message.actions[0].name === 'yes') {
+        const infoPayload = message.text;
+        const urlToDelete = infoPayload.split('||')[1].replace('\'','');
+        const userRequestingDelete = `<@${infoPayload.split('||')[0].replace('\'','')}>`;
+        const currentChannel = `<#${message.channel}>`;
+        console.log('Payload: ', urlToDelete, userRequestingDelete, currentChannel);
+        mongooseConnection.Records.deleteOne({
+            user: userRequestingDelete,
+          url: urlToDelete,
+          channel: currentChannel
+        },
+        function (err) {
+          if(err) return console.log(err);
+            bot.replyInteractive(message, 'Alright, deleted!');
+        })
+      }
+      if(message.actions[0].name === 'no') {
+        bot.replyInteractive(message, 'No probs, nothing deleted');
+      }
+      
+    }
+  })
   controller.hears('^links from this week', 'direct_mention'    , function(bot, message) {
     const userChannel = `<#${message.channel}>`;
     const untilDate = new Date();
