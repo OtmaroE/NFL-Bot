@@ -3,33 +3,33 @@ module.exports = function(controller) {
   // Positive result: <http://www.google.com|www.google.com>
   const urlRegex = new RegExp('^<(.*)\:\/\/(.*)\.(.*)\.(.*)\.(.*)>');
   
-  controller.hears('Show me around', 'direct_message, direct_mention', function(bot, message) {
+  controller.hears('Show me around', 'direct_message, direct_mention', (bot, message) => {
     const helpString = `:drake: To add a link type: \`link <link>\`
 :drake: To show all the links you have saved type: \`show links\`
 :drake: To delete a link from your list type: \`unlink <link>\`
 :drake: Have fun around!`;
-
     bot.reply(message, helpString);
   });
   
-  controller.hears(['^link\ (.*)', '^link '], 'direct_message, direct_mention,', function(bot, message) {
-    
+  controller.hears(['^link\ (.*)', '^link '], 'direct_message, direct_mention,', (bot, message) => {
     // message.match.input should be: link <http://www.google.com|www.google.com>
     const linkToSave = message.match.input.split(' ')[1];
     const userRequestingInsert = `<@${message.user}>`;
     const userChannel = `<#${message.channel}>`;
-    
     if (!urlRegex.test(linkToSave))  
        return bot.reply(message, ' :warning: Please use correct format: `www.site.domain`');
-    mongooseConnection.Links.find({
-      user: userRequestingInsert,
-      url: linkToSave
-    })
+    const findLinks = new Promise((resolve, reject) => {
+      mongooseConnection.Links.find({
+        user: userRequestingInsert,
+        url: linkToSave
+      }, (err, links) => {
+        if(err) reject(err);
+        resolve(links);
+      });
+    });
+    findLinks
     .then((link) => {
       if(link[0]) throw ('Link is already there, sorry :neutral_face:');
-      return;
-    })
-    .then( () => {
       return mongooseConnection.Links.create({
         user: userRequestingInsert,
         channel: userChannel,
@@ -45,11 +45,17 @@ module.exports = function(controller) {
     
   });
   
-  controller.hears('show links', 'direct_message, direct_mention', function(bot, message) {
-    const userRequestingInfo = `<@${message.user}>`
-    mongooseConnection.Links.find({ 
-      user: userRequestingInfo 
+  controller.hears('show links', 'direct_message, direct_mention', (bot, message) => {
+    const userRequestingInfo = `<@${message.user}>`;
+    const getLinks = new Promise((resolve, reject) => {
+      mongooseConnection.Links.find({ 
+        user: userRequestingInfo 
+      }, (err, links) => {
+        if(err) reject(err);
+        resolve(links);
+      });
     })
+    getLinks
     .then((linkList) => {
       if(!linkList[0]) throw ('No links yet buddy');
       const urls = linkList.map((dbEntry) => dbEntry.url);
@@ -81,12 +87,12 @@ module.exports = function(controller) {
       })
     });
     deletePromise
-      .then((promiseResponse) => {
-        bot.reply(message, promiseResponse);
-      })
-      .catch((promiseFailed) => {
-        bot.reply(message, promiseFailed);
-      });
+    .then((promiseResponse) => {
+      bot.reply(message, promiseResponse);
+    })
+    .catch((promiseFailed) => {
+      bot.reply(message, promiseFailed);
+    });
   });
   
   controller.hears('Do you love me?', 'direct_message, direct_mention', function(bot, message) {
