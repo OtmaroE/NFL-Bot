@@ -45,6 +45,7 @@ const RoleMapping = mongoose.model('RoleMapping', roleMappingSchema);
 const userSchema = mongoose.Schema({
   username: String,
   password: String,
+  slackId: String,
   email: String,
   role: String
 },
