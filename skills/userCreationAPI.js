@@ -1,9 +1,6 @@
 const axios = require('axios');
 const { APIURL } = process.env;
 
-function userCreationRequest(userInfo) {
-  return axios.post(APIURL, userInfo);
-}
 module.exports = function(controller) {
   
   controller.hears('create account (.*)', 'direct_message', function(bot, message) {
@@ -22,24 +19,22 @@ module.exports = function(controller) {
         if(error) reject('Could not get users\'s channel info');
         const channelsInfoArray = response.channels;
         const channelsIdArray = channelsInfoArray.map((element) => element.id);
-        console.log(channelsIdArray);
         resolve(channelsIdArray);
       })
     })
     Promise.all([getUserInfo, getChannelList])
     .then(([[username, email], channelsIdArray]) => {
-      // insertUserOnDb(username, slackId, password);
-      // return email message
-      const userInfo = {};
-      userInfo.username = username;
-      userInfo.password = password;
-      userInfo.slackId = slackId;
-      userInfo.email = email;
-      userInfo.emailVerified = false;
-      userInfo.role = 'user';
-      userInfo.channels = channelsIdArray;
+      const userInfo = {
+        username,
+        password,
+        slackId,
+        email,
+        emailVerified: false,
+        role: 'user',
+        channels: channelsIdArray
+      }
       bot.reply(message, 'Creating user account...');
-      const request = userCreationRequest(userInfo)
+      axios.post(APIURL, userInfo)
       .then((apiResponse) => {
         bot.reply(message, 'Account succesfully created!');
         bot.reply(message, 'Please check your email to confirm your account');
@@ -47,9 +42,8 @@ module.exports = function(controller) {
       })
       .catch((err) => {
         bot.reply(message, 'Error: Your account already exists!');
-        // console.log(err);
-      })
-      //bot.reply(message, `Username: ${username}\nSlackId: ${slackId}\nPassword: ${password}\nEmail: ${email}`);
+        console.log(err);
+      });
     })
     .catch((error)=> {
       console.log(error);
