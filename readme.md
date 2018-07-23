@@ -23,3 +23,4 @@ as soon as it joins a channel it will keep track of any link it sees. It will al
 - links from #channel: (direct mention) It will display all the links from #channel note: it only works for publick channels.
 - links shared by @name: (direct mention) it has the following overloads -> about (tag) or (tag2), this week, this month.
 - links with +(number): (direct message or mention) it has the following overload -> about (tag), about (tag) or (tag2).
+- create account password:(your password): It creates you an account to use in our NFL API
