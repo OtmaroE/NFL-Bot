@@ -41,8 +41,8 @@ module.exports = function(controller) {
         console.log(apiResponse.data);
       })
       .catch((err) => {
-        bot.reply(message, 'Error: Your account already exists!');
-        console.log(err);
+        if(err.response.data.error) return bot.reply(message, `${err.response.data.error.message}\n `);
+        bot.reply(message, 'Ups, something went wrong try something different');
       });
     })
     .catch((error)=> {
